@@ -19,6 +19,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -126,16 +127,6 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
       'battery': '%84',
       'requestDate': '24.08.2026',
     },
-    {
-      'name': 'Ahmet Güvenilir',
-      'phone': '+90 555 123 4567',
-      'status': 'Onay Bekliyor (24 Saat İçinde İptal Olur)',
-      'isApproved': false,
-      'distance': 'Hesaplanıyor...',
-      'location': 'Beklemede',
-      'battery': '-',
-      'requestDate': 'Bugün, 10:15',
-    },
   ];
 
   String _maskName(String fullName) {
@@ -196,15 +187,6 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
             'cost': 199.99,
             'frequency': 'Hiç Kullanmadım',
             'isGhost': true,
-            'period': 'Aylık',
-          },
-          {
-            'id': '2',
-            'title': 'Spotify',
-            'category': 'Müzik & PodCast',
-            'cost': 59.99,
-            'frequency': 'Haftada Birkaç Gün',
-            'isGhost': false,
             'period': 'Aylık',
           },
         ];
@@ -374,6 +356,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
     );
   }
 
+  // --- GÜVENLİK AĞI & MESAFE TAKİBİ EKRANI ---
   Widget _buildTrackedNetworkView(bool isDark) {
     return ListView(
       padding: const EdgeInsets.all(16.0),
@@ -389,7 +372,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text('Güvenlik Ağı & Mesafe Takibi', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: isDark ? Colors.white : Colors.black87)),
-                    Text('Anlık konum, mesafe ve onaylı SMS yönetimi', style: TextStyle(color: isDark ? const Color(0xFF9CA3AF) : Colors.grey[600], fontSize: 11)),
+                    Text('Anlık konum, mesafe ve operatör SMS yönetimi', style: TextStyle(color: isDark ? const Color(0xFF9CA3AF) : Colors.grey[600], fontSize: 11)),
                   ],
                 ),
               ],
@@ -519,6 +502,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
     );
   }
 
+  // --- OPERATÖR SMS TETİKLEYİCİ İLE KİŞİ EKLEME DİALOGU ---
   void _showAddTrackedPersonDialog(bool isDark) {
     final nameController = TextEditingController();
     final phoneController = TextEditingController();
@@ -553,7 +537,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                 borderRadius: BorderRadius.circular(10),
               ),
               child: const Text(
-                'Gönderilecek Onay SMS Metni:\n"LifeMetric Güvenlik Ağı kapsamında Kemal ERDAL sizi güvenlik ağına eklemek istiyor. Onay vermek için tıklayın: [Güvenli Onay Linki] (Onaylamazsanız bu talep 24 saat içinde otomatik iptal edilir.)"',
+                'Bu buton, telefonunuzdaki SMS uygulamasını açarak kendi operatör paketiniz üzerinden davet mesajı göndermenizi sağlar.',
                 style: TextStyle(fontSize: 10, fontStyle: FontStyle.italic, color: Color(0xFF38BDF8)),
               ),
             ),
@@ -566,12 +550,35 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
           ),
           ElevatedButton(
             style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF2563EB)),
-            onPressed: () {
+            onPressed: () async {
               if (nameController.text.isNotEmpty && phoneController.text.isNotEmpty) {
+                String phone = phoneController.text.trim();
+                String message = "LifeMetric Güvenlik Ağı kapsamında Kemal ERDAL sizi güvenlik ağına eklemek istiyor. Onay vermek için tıklayın: https://kemalerdal1980-creator.github.io/lifemetric/";
+
+                // Telefonun kendi SMS uygulamasını tetikleme URI'si (Operatör paketinizden gider)
+                final Uri smsUri = Uri(
+                  scheme: 'sms',
+                  path: phone,
+                  queryParameters: <String, String>{
+                    'body': message,
+                  },
+                );
+
+                try {
+                  if (await canLaunchUrl(smsUri)) {
+                    await launchUrl(smsUri);
+                  } else {
+                    // Web tarayıcısında test ediliyorsa veya SMS desteklemiyorsa alternatif açılış
+                    await launchUrl(smsUri, mode: LaunchMode.externalApplication);
+                  }
+                } catch (e) {
+                  // Hata durumunda yoksay
+                }
+
                 setState(() {
                   _trackedSecurityNetwork.add({
                     'name': nameController.text,
-                    'phone': phoneController.text,
+                    'phone': phone,
                     'status': 'Onay Bekliyor (24 Saat İçinde İptal Olur)',
                     'isApproved': false,
                     'distance': 'Hesaplanıyor...',
@@ -580,24 +587,25 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                     'requestDate': 'Bugün',
                   });
                 });
+
                 Navigator.pop(context);
                 ScaffoldMessenger.of(context).showSnackBar(
                   const SnackBar(
-                    content: Text('Onay SMS\'i gönderildi! Karşı tarafın onayı bekleniyor.'),
+                    content: Text('SMS uygulaması açıldı! Mesajı göndererek daveti tamamlayın.'),
                     backgroundColor: Color(0xFF10B981),
                     duration: Duration(seconds: 3),
                   ),
                 );
               }
             },
-            child: const Text('Davet Gönder & Ekle', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+            child: const Text('SMS Uygulamasını Aç & Ekle', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
           ),
         ],
       ),
     );
   }
 
-  // --- ÇAĞRI KALKANI & REHBER YÖNETİMİ EKRANI (Ekleme, Silme ve Kutucuklu Yapı) ---
+  // --- ÇAĞRI KALKANI & REHBER YÖNETİMİ EKRANI ---
   Widget _buildCallShieldView(bool isDark) {
     return ListView(
       padding: const EdgeInsets.all(16.0),
@@ -687,7 +695,6 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                         ],
                       ),
                     ),
-                    // ÇÖP KUTUSU SİLME BUTONU
                     IconButton(
                       icon: const Icon(Icons.delete_outline, color: Color(0xFFEF4444), size: 22),
                       tooltip: 'Kişiyi Kaldır',
@@ -710,7 +717,6 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    // 1. Seçenek: Çağrı Engelleme Kutucuğu
                     Row(
                       children: [
                         Checkbox(
@@ -719,7 +725,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                           onChanged: (bool? value) {
                             setState(() {
                               contact['block'] = value ?? false;
-                              if (contact['block']) contact['mask'] = false; // Çakışmayı önle
+                              if (contact['block']) contact['mask'] = false;
                             });
                           },
                         ),
@@ -733,7 +739,6 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                         ),
                       ],
                     ),
-                    // 2. Seçenek: Maskeli Çağrı Kutucuğu
                     Row(
                       children: [
                         Checkbox(
@@ -742,7 +747,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                           onChanged: (bool? value) {
                             setState(() {
                               contact['mask'] = value ?? false;
-                              if (contact['mask']) contact['block'] = false; // Çakışmayı önle
+                              if (contact['mask']) contact['block'] = false;
                             });
                           },
                         ),
@@ -1026,21 +1031,6 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                 _buildDetailRow(Icons.shopping_bag_outlined, 'Alışveriş & Dolap App', '45 Dakika (%3)', isDark),
                 _buildDetailRow(Icons.directions_bus, 'Yol & Ulaşım', '1.5 Saat (%6)', isDark),
                 _buildDetailRow(Icons.work_outline, 'Çalışma / Ofis & Diğer', '10 Saat (%43)', isDark),
-              ],
-            ),
-          ),
-          _buildWrappedCard(
-            title: 'Sosyal & İletişim Detayları',
-            mainStat: '184 Saat Toplam Etkileşim',
-            icon: Icons.forum_rounded,
-            color: const Color(0xFF10B981),
-            isDark: isDark,
-            child: Column(
-              children: [
-                _buildDetailRow(Icons.phone, 'Telefon Görüşmeleri', '42 Sa (En Çok: Eşim - 412 Arama)', isDark),
-                _buildDetailRow(Icons.chat_bubble_outline, 'WhatsApp', '86 Sa (12.450 Mesaj, 32 Grup)', isDark),
-                _buildDetailRow(Icons.sms_outlined, 'SMS / Metin Mesajı', '12 Sa (Çoğunluk: Doğrulama Kodu & Banka)', isDark),
-                _buildDetailRow(Icons.share, 'Sosyal Medya DM', '44 Sa (Instagram & LinkedIn Mesajları)', isDark),
               ],
             ),
           ),

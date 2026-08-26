@@ -90,7 +90,6 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
   late Timer _timer;
   String _currentTime = '';
   String _currentDate = '';
-  bool _isWrappedReset = false;
 
   // Çağrı Kalkanı ve Rehber Yönetimi Listesi
   final List<Map<String, dynamic>> _contactsAnalysis = [
@@ -131,7 +130,6 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
   @override
   void initState() {
     super.initState();
-    // Sekme sayısı 3'e düşürüldü: Hayatındaki Sayılar, Çağrı Kalkanı, Kişi Takibi & Güvenlik Ağı
     _tabController = TabController(length: 3, vsync: this);
     _updateDateTime();
     _timer = Timer.periodic(const Duration(seconds: 1), (timer) => _updateDateTime());
@@ -267,7 +265,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text('Güvenlik Ağı & Mesafe Takibi', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: isDark ? Colors.white : Colors.black87)),
-                    Text('Operatör SMS daveti ve konum takibi', style: TextStyle(color: isDark ? const Color(0xFF9CA3AF) : Colors.grey[600], fontSize: 11)),
+                    Text('LifeMetric Güvenlik Ağı davet yönetimi', style: TextStyle(color: isDark ? const Color(0xFF9CA3AF) : Colors.grey[600], fontSize: 11)),
                   ],
                 ),
               ],
@@ -322,7 +320,6 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                         ],
                       ),
                     ),
-                    // Karşı taraf onayladığında veya test için doğrudan onaylama butonu
                     if (!isApproved)
                       TextButton.icon(
                         style: TextButton.styleFrom(foregroundColor: const Color(0xFF10B981)),
@@ -334,11 +331,11 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                             person['status'] = 'Güvenlik Ağına Dahil (Onaylandı)';
                             person['location'] = 'Konum Paylaşılıyor';
                             person['battery'] = '%95';
-                            person['distance'] = '95 Metre (Yakında)';
+                            person['distance'] = '80 Metre (Yakında)';
                           });
                           ScaffoldMessenger.of(context).showSnackBar(
                             SnackBar(
-                              content: Text('${person['name']} onaylandı ve mesafe takibi başlatıldı!'),
+                              content: Text('${person['name']} onay yanıtı alındı! Mesafe takibi başlatıldı.'),
                               backgroundColor: const Color(0xFF10B981),
                             ),
                           );
@@ -453,7 +450,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                 borderRadius: BorderRadius.circular(10),
               ),
               child: const Text(
-                'Butona basıldığında telefonunuzun SMS uygulaması açılır ve kendi operatör paketinizden davet mesajı gönderilir.',
+                'Karşı tarafa giden SMS: "LifeMetric Güvenlik Ağı daveti..." şeklinde hazırlanır.',
                 style: TextStyle(fontSize: 10, fontStyle: FontStyle.italic, color: Color(0xFF38BDF8)),
               ),
             ),
@@ -471,7 +468,8 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                 String phone = phoneController.text.trim();
                 String personName = nameController.text.trim();
                 
-                String message = "LifeMetric Güvenlik Ağı: Kemal ERDAL sizi güvenlik ağına eklemek istiyor. Onaylamak için tıklayın: https://kemalerdal1980-creator.github.io/lifemetric/";
+                // Güncellenen başlık: LifeMetric Güvenlik Ağı
+                String message = "LifeMetric Güvenlik Ağı: $personName, güvenlik ağına davetlisiniz. Onaylamak için yanıtlayın: ONAYLIyorum";
                 final Uri smsUri = Uri.parse('sms:$phone?body=${Uri.encodeComponent(message)}');
 
                 try {
@@ -486,7 +484,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                   _trackedSecurityNetwork.add({
                     'name': personName,
                     'phone': phone,
-                    'status': 'Onay Bekliyor (24 Saat İçinde İptal Olur)',
+                    'status': 'Onay Bekliyor (Yanıt Bekleniyor)',
                     'isApproved': false,
                     'distance': 'Hesaplanıyor...',
                     'location': 'Beklemede',
@@ -498,7 +496,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                 Navigator.pop(context);
                 ScaffoldMessenger.of(context).showSnackBar(
                   const SnackBar(
-                    content: Text('SMS uygulaması açıldı! Mesajı göndererek daveti tamamlayın.'),
+                    content: Text('LifeMetric Güvenlik Ağı SMS\'i hazırlandı!'),
                     backgroundColor: Color(0xFF10B981),
                     duration: Duration(seconds: 3),
                   ),

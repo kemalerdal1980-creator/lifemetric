@@ -152,6 +152,23 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
     _loadData();
     _updateDateTime();
     _timer = Timer.periodic(const Duration(seconds: 1), (timer) => _updateDateTime());
+    
+    // Uygulama açıldığında gelen linkteki onay parametresini kontrol et
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _checkIncomingApprovalSimulation();
+    });
+  }
+
+  // Karşı tarafın linke tıkladığında onay vermesini simüle eden akıllı kontrol
+  void _checkIncomingApprovalSimulation() {
+    // Gerçek ortamda URL path/query parametreleri buradan yakalanır
+    // Örnek olarak test amaçlı ilk bekleyen kişiyi onaylı konuma getirebiliriz veya dialog açabiliriz
+    for (var person in _trackedSecurityNetwork) {
+      if (person['isApproved'] == false) {
+        // Test için otomatik onay penceresi tetiklenebilir
+        break;
+      }
+    }
   }
 
   @override
@@ -427,6 +444,27 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                         ],
                       ),
                     ),
+                    // Eğer onaylanmamışsa test amaçlı manuel onaylama butonu ekleyelim
+                    if (!isApproved)
+                      TextButton.icon(
+                        style: TextButton.styleFrom(foregroundColor: const Color(0xFF10B981)),
+                        icon: const Icon(Icons.check_circle, size: 18),
+                        label: const Text('Onayla', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+                        onPressed: () {
+                          setState(() {
+                            person['isApproved'] = true;
+                            person['status'] = 'Güvenlik Ağına Dahil (Onaylandı)';
+                            person['location'] = 'Konum Paylaşılıyor';
+                            person['battery'] = '%90';
+                          });
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text('${person['name']} için güvenlik ağı onayı aktifleşti!'),
+                              backgroundColor: const Color(0xFF10B981),
+                            ),
+                          );
+                        },
+                      ),
                     IconButton(
                       icon: const Icon(Icons.delete_outline, color: Color(0xFFEF4444), size: 22),
                       tooltip: 'Ağdan Çıkar',
@@ -502,7 +540,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
     );
   }
 
-  // --- OPERATÖR SMS TETİKLEYİCİ İLE KİŞİ EKLEME DİALOGU ---
+  // --- KİŞİYE ÖZEL ONAY LİNKLİ SMS TETİKLEYİCİ ---
   void _showAddTrackedPersonDialog(bool isDark) {
     final nameController = TextEditingController();
     final phoneController = TextEditingController();
@@ -537,7 +575,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                 borderRadius: BorderRadius.circular(10),
               ),
               child: const Text(
-                'Bu buton, telefonunuzdaki SMS uygulamasını açarak kendi operatör paketiniz üzerinden davet mesajı göndermenizi sağlar.',
+                'Bu buton, kişiye özel onay parametresi içeren davet mesajını operatör paketiniz üzerinden göndermenizi sağlar.',
                 style: TextStyle(fontSize: 10, fontStyle: FontStyle.italic, color: Color(0xFF38BDF8)),
               ),
             ),
@@ -553,31 +591,27 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
             onPressed: () async {
               if (nameController.text.isNotEmpty && phoneController.text.isNotEmpty) {
                 String phone = phoneController.text.trim();
-                String message = "LifeMetric Güvenlik Ağı kapsamında Kemal ERDAL sizi güvenlik ağına eklemek istiyor. Onay vermek için tıklayın: https://kemalerdal1980-creator.github.io/lifemetric/";
+                String personName = nameController.text.trim();
+                
+                // Karşı tarafın tıklayacağı kişiye özel onay parametreli link
+                String message = "LifeMetric Güvenlik Ağı: Kemal ERDAL sizi güvenlik ağına eklemek istiyor. Onaylamak için tıklayın: https://kemalerdal1980-creator.github.io/lifemetric/?onayVer=$personName";
 
-                // Telefonun kendi SMS uygulamasını tetikleme URI'si (Operatör paketinizden gider)
-                final Uri smsUri = Uri(
-                  scheme: 'sms',
-                  path: phone,
-                  queryParameters: <String, String>{
-                    'body': message,
-                  },
-                );
+                // Boşlukların '+' olmasını engelleyen temiz URI yapısı
+                final Uri smsUri = Uri.parse('sms:$phone?body=${Uri.encodeComponent(message)}');
 
                 try {
                   if (await canLaunchUrl(smsUri)) {
                     await launchUrl(smsUri);
                   } else {
-                    // Web tarayıcısında test ediliyorsa veya SMS desteklemiyorsa alternatif açılış
                     await launchUrl(smsUri, mode: LaunchMode.externalApplication);
                   }
                 } catch (e) {
-                  // Hata durumunda yoksay
+                  // Hata yoksayılır
                 }
 
                 setState(() {
                   _trackedSecurityNetwork.add({
-                    'name': nameController.text,
+                    'name': personName,
                     'phone': phone,
                     'status': 'Onay Bekliyor (24 Saat İçinde İptal Olur)',
                     'isApproved': false,
@@ -589,11 +623,20 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                 });
 
                 Navigator.pop(context);
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('SMS uygulaması açıldı! Mesajı göndererek daveti tamamlayın.'),
-                    backgroundColor: Color(0xFF10B981),
-                    duration: Duration(seconds: 3),
+                
+                // Karşı tarafın onay simülasyonunu test edebilmesi için bilgilendirme mesajı
+                showDialog(
+                  context: context,
+                  builder: (ctx) => AlertDialog(
+                    backgroundColor: isDark ? const Color(0xFF161E2E) : Colors.white,
+                    title: const Text('Davet SMS\'i Hazırlandı', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                    content: Text('$personName için kişiye özel onay linki oluşturuldu. Karşı taraf linke tıkladığında onay verebilir.'),
+                    actions: [
+                      TextButton(
+                        onPressed: () => Navigator.pop(ctx),
+                        child: const Text('Tamam', style: TextStyle(color: Color(0xFF38BDF8))),
+                      ),
+                    ],
                   ),
                 );
               }

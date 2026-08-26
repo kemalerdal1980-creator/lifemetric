@@ -94,7 +94,6 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
   String _currentDate = '';
   bool _isWrappedReset = false;
 
-  // Rehber ve Maskeli / Engellenen Kişiler Listesi
   final List<Map<String, dynamic>> _contactsAnalysis = [
     {
       'name': 'Ay\u015fin Erdal (E\u015fim)',
@@ -115,15 +114,6 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
       'isBlocked': false,
     },
     {
-      'name': 'Ke\u015fkink\u0131l\u0131\u00e7 A.\u015e. Ofis',
-      'phone': '+90 212 444 0000',
-      'lastCall': 'Bugün, 11:30',
-      'duration': '22 Dakika',
-      'status': 'Aktif / Kurumsal Hat',
-      'isActive': true,
-      'isBlocked': false,
-    },
-    {
       'name': 'Reklam / Spam Numara',
       'phone': '+90 850 999 8877',
       'lastCall': 'Bugün, 09:15',
@@ -131,6 +121,29 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
       'status': 'Engellenmiş Numara',
       'isActive': false,
       'isBlocked': true,
+    },
+  ];
+
+  final List<Map<String, dynamic>> _trackedSecurityNetwork = [
+    {
+      'name': 'Ayşin Erdal',
+      'phone': '+90 532 555 4433',
+      'status': 'Güvenlik Ağına Dahil (Onaylandı)',
+      'isApproved': true,
+      'distance': '350 Metre (Yakın Bölgede - Ev)',
+      'location': 'Ev / İstanbul',
+      'battery': '%84',
+      'requestDate': '24.08.2026',
+    },
+    {
+      'name': 'Ahmet Güvenilir',
+      'phone': '+90 555 123 4567',
+      'status': 'Onay Bekliyor (24 Saat İçinde İptal Olur)',
+      'isApproved': false,
+      'distance': 'Hesaplanıyor...',
+      'location': 'Beklemede',
+      'battery': '-',
+      'requestDate': 'Bugün, 10:15',
     },
   ];
 
@@ -153,8 +166,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
   @override
   void initState() {
     super.initState();
-    // 3 Sekmeli Yapı: Abonelikler, Hayatındaki Sayılar, Gizlilik & Rehber Kalkanı
-    _tabController = TabController(length: 3, vsync: this);
+    _tabController = TabController(length: 4, vsync: this);
     _loadData();
     _updateDateTime();
     _timer = Timer.periodic(const Duration(seconds: 1), (timer) => _updateDateTime());
@@ -202,16 +214,6 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
             'cost': 59.99,
             'frequency': 'Haftada Birkaç Gün',
             'isGhost': false,
-            'period': 'Aylık',
-          },
-          {
-            'id': '3',
-            'title': 'Ev İnterneti',
-            'category': 'İletişim & Ev',
-            'cost': 340.00,
-            'frequency': 'Her Gün',
-            'isGhost': false,
-            'commitmentWarning': '14 Gün Kaldı',
             'period': 'Aylık',
           },
         ];
@@ -337,7 +339,8 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
           tabs: const [
             Tab(icon: Icon(Icons.account_balance_wallet_outlined, size: 18), text: 'Abonelikler'),
             Tab(icon: Icon(Icons.bar_chart_rounded, size: 18), text: 'Hayatındaki Sayılar'),
-            Tab(icon: Icon(Icons.security_rounded, size: 18), text: 'Gizlilik & Çağrı Kalkanı'),
+            Tab(icon: Icon(Icons.security_rounded, size: 18), text: 'Çağrı Kalkanı'),
+            Tab(icon: Icon(Icons.person_search_rounded, size: 18), text: 'Kişi Takibi & Güvenlik Ağı'),
           ],
         ),
       ),
@@ -349,7 +352,8 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
               children: [
                 _buildDashboardView(isDark),
                 _buildLifeWrappedView(isDark),
-                _buildCallShieldView(isDark), // YENİ: MASKELENDİRME VE ENGELLEME MENÜSÜ
+                _buildCallShieldView(isDark),
+                _buildTrackedNetworkView(isDark),
               ],
             ),
           ),
@@ -363,9 +367,9 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text(
+                const Text(
                   'Developed by Kemal ERDAL',
-                  style: TextStyle(color: isDark ? const Color(0xFF60A5FA) : const Color(0xFF2563EB), fontSize: 11, fontWeight: FontWeight.bold),
+                  style: TextStyle(color: Color(0xFF60A5FA), fontSize: 11, fontWeight: FontWeight.bold),
                 ),
                 Text(
                   '© 2026 LifeMetric. Tüm Hakları Saklıdır.',
@@ -379,7 +383,229 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
     );
   }
 
-  // GİZLİLİK VE ÇAĞRI KALKANI (MASKELENDİRME & ENGELLEME MODÜLÜ)
+  Widget _buildTrackedNetworkView(bool isDark) {
+    return ListView(
+      padding: const EdgeInsets.all(16.0),
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Row(
+              children: [
+                const Icon(Icons.verified_user_rounded, color: Color(0xFF38BDF8), size: 24),
+                const SizedBox(width: 12),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('Güvenlik Ağı & Mesafe Takibi', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: isDark ? Colors.white : Colors.black87)),
+                    Text('Anlık konum, mesafe ve onaylı SMS yönetimi', style: TextStyle(color: isDark ? const Color(0xFF9CA3AF) : Colors.grey[600], fontSize: 11)),
+                  ],
+                ),
+              ],
+            ),
+            ElevatedButton.icon(
+              style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF2563EB)),
+              icon: const Icon(Icons.person_add_alt_1, size: 16, color: Colors.white),
+              label: const Text('Yeni Kişi Ekle', style: TextStyle(fontSize: 12, color: Colors.white, fontWeight: FontWeight.bold)),
+              onPressed: () => _showAddTrackedPersonDialog(isDark),
+            ),
+          ],
+        ),
+        const SizedBox(height: 20),
+        ..._trackedSecurityNetwork.asMap().entries.map((entry) {
+          int index = entry.key;
+          var person = entry.value;
+          bool isApproved = person['isApproved'];
+
+          return Container(
+            margin: const EdgeInsets.only(bottom: 14),
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: isDark ? const Color(0xFF161E2E) : Colors.white,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(
+                color: isApproved ? const Color(0xFF10B981).withOpacity(0.5) : const Color(0xFFF59E0B).withOpacity(0.5),
+                width: 1.5,
+              ),
+              boxShadow: isDark ? [] : [BoxShadow(color: Colors.grey.withOpacity(0.1), blurRadius: 6, offset: const Offset(0, 2))],
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    CircleAvatar(
+                      radius: 24,
+                      backgroundColor: isApproved ? const Color(0xFF10B981).withOpacity(0.2) : const Color(0xFFF59E0B).withOpacity(0.2),
+                      child: Icon(
+                        isApproved ? Icons.security : Icons.hourglass_top_rounded,
+                        color: isApproved ? const Color(0xFF10B981) : const Color(0xFFF59E0B),
+                      ),
+                    ),
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(person['name'], style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: isDark ? Colors.white : Colors.black87)),
+                          const SizedBox(height: 2),
+                          Text(person['phone'], style: TextStyle(color: isDark ? const Color(0xFF9CA3AF) : Colors.grey[600], fontSize: 12)),
+                        ],
+                      ),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.delete_outline, color: Color(0xFFEF4444), size: 22),
+                      tooltip: 'Ağdan Çıkar',
+                      onPressed: () {
+                        setState(() {
+                          _trackedSecurityNetwork.removeAt(index);
+                        });
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('Kişi güvenlik ağından çıkarıldı.'),
+                            backgroundColor: Colors.red,
+                            duration: Duration(seconds: 2),
+                          ),
+                        );
+                      },
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                Divider(color: isDark ? Colors.white10 : Colors.grey[200], height: 1),
+                const SizedBox(height: 10),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Row(
+                      children: [
+                        const Icon(Icons.near_me_rounded, size: 16, color: Color(0xFF38BDF8)),
+                        const SizedBox(width: 6),
+                        Text('Mesafe: ', style: TextStyle(fontSize: 12, color: isDark ? const Color(0xFF9CA3AF) : Colors.grey[600])),
+                        Text(person['distance'], style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: isDark ? Colors.white : Colors.black87)),
+                      ],
+                    ),
+                    if (isApproved)
+                      Row(
+                        children: [
+                          const Icon(Icons.battery_charging_full, size: 16, color: Color(0xFF10B981)),
+                          const SizedBox(width: 4),
+                          Text(person['battery'], style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: isDark ? Colors.white : Colors.black87)),
+                        ],
+                      ),
+                  ],
+                ),
+                const SizedBox(height: 6),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                      decoration: BoxDecoration(
+                        color: isApproved ? const Color(0xFF10B981).withOpacity(0.15) : const Color(0xFFF59E0B).withOpacity(0.15),
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: Text(
+                        person['status'],
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.bold,
+                          color: isApproved ? const Color(0xFF10B981) : const Color(0xFFF59E0B),
+                        ),
+                      ),
+                    ),
+                    Text(
+                      isApproved ? 'Konum: ${person['location']}' : 'Talep Tarihi: ${person['requestDate']}',
+                      style: TextStyle(fontSize: 11, color: isDark ? const Color(0xFF9CA3AF) : Colors.grey[600]),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          );
+        }).toList(),
+      ],
+    );
+  }
+
+  void _showAddTrackedPersonDialog(bool isDark) {
+    final nameController = TextEditingController();
+    final phoneController = TextEditingController();
+
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: isDark ? const Color(0xFF161E2E) : Colors.white,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Text('Güvenlik Ağına Kişi Ekle', style: TextStyle(color: isDark ? Colors.white : Colors.black87, fontWeight: FontWeight.bold, fontSize: 16)),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            TextField(
+              controller: nameController,
+              style: TextStyle(color: isDark ? Colors.white : Colors.black87),
+              decoration: InputDecoration(labelText: 'Kişi Adı', labelStyle: TextStyle(color: isDark ? const Color(0xFF9CA3AF) : Colors.grey[600])),
+            ),
+            const SizedBox(height: 10),
+            TextField(
+              controller: phoneController,
+              keyboardType: TextInputType.phone,
+              style: TextStyle(color: isDark ? Colors.white : Colors.black87),
+              decoration: InputDecoration(labelText: 'Telefon Numarası (+90 ...)', labelStyle: TextStyle(color: isDark ? const Color(0xFF9CA3AF) : Colors.grey[600])),
+            ),
+            const SizedBox(height: 16),
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: isDark ? const Color(0xFF1F2937) : Colors.grey[200],
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: const Text(
+                'Gönderilecek Onay SMS Metni:\n"LifeMetric Güvenlik Ağı kapsamında Kemal ERDAL sizi güvenlik ağına eklemek istiyor. Onay vermek için tıklayın: [Güvenli Onay Linki] (Onaylamazsanız bu talep 24 saat içinde otomatik iptal edilir.)"',
+                style: TextStyle(fontSize: 10, fontStyle: FontStyle.italic, color: Color(0xFF38BDF8)),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('İptal', style: TextStyle(color: Colors.grey)),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF2563EB)),
+            onPressed: () {
+              if (nameController.text.isNotEmpty && phoneController.text.isNotEmpty) {
+                setState(() {
+                  _trackedSecurityNetwork.add({
+                    'name': nameController.text,
+                    'phone': phoneController.text,
+                    'status': 'Onay Bekliyor (24 Saat İçinde İptal Olur)',
+                    'isApproved': false,
+                    'distance': 'Hesaplanıyor...',
+                    'location': 'Beklemede',
+                    'battery': '-',
+                    'requestDate': 'Bugün',
+                  });
+                });
+                Navigator.pop(context);
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Onay SMS\'i gönderildi! Karşı tarafın onayı bekleniyor.'),
+                    backgroundColor: Color(0xFF10B981),
+                    duration: Duration(seconds: 3),
+                  ),
+                );
+              }
+            },
+            child: const Text('Davet Gönder & Ekle', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildCallShieldView(bool isDark) {
     return ListView(
       padding: const EdgeInsets.all(16.0),
@@ -452,7 +678,6 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                     ],
                   ),
                 ),
-                // Engelle / Engeli Kaldır Butonu
                 IconButton(
                   icon: Icon(
                     isBlocked ? Icons.check_circle_outline : Icons.cancel_outlined,
@@ -468,7 +693,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                       SnackBar(
                         content: Text(isBlocked 
                           ? '${contact['name']} engel listesinden çıkarıldı.' 
-                          : '${contact['name']} (${maskedName}) başarıyla engellendi! Artık arayamayacak.'),
+                          : '${contact['name']} (${maskedName}) başarıyla engellendi!'),
                         backgroundColor: isBlocked ? const Color(0xFF10B981) : Colors.red,
                         duration: const Duration(seconds: 2),
                       ),
@@ -920,17 +1145,20 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                       style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF2563EB)),
                       onPressed: () {
                         if (titleController.text.isNotEmpty && costController.text.isNotEmpty) {
-                          _addSubscription(
-                            titleController.text,
-                            category,
-                            double.tryParse(costController.text) ?? 0.0,
-                            frequency,
-                            commitmentController.text,
-                          );
-                          Navigator.pop(context);
+                          double? cost = double.tryParse(costController.text);
+                          if (cost != null) {
+                            _addSubscription(
+                              titleController.text,
+                              category,
+                              cost,
+                              frequency,
+                              commitmentController.text,
+                            );
+                            Navigator.pop(context);
+                          }
                         }
                       },
-                      child: const Text('Kaydet ve Ekle', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                      child: const Text('Aboneliği Kaydet', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 15)),
                     ),
                   ),
                 ],

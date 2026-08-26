@@ -26,15 +26,16 @@ import 'package:firebase_database/firebase_database.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   
-  // Firebase Başlatma (Güvenli Blok)
+  // Sizin Kendi Gerçek Firebase Bağlantı Bilgileriniz (LifeMetricApp)
   try {
     await Firebase.initializeApp(
       options: const FirebaseOptions(
-        apiKey: "AIzaSyDummyKeyForLifeMetric2026",
-        appId: "1:2026:web:lifemetric",
-        messagingSenderId: "20260000",
-        projectId: "lifemetric-db",
-        databaseURL: "https://lifemetric-default-rtdb.firebaseio.com",
+        apiKey: "AIzaSyCtUQEIoAkHitsEYCo-EK218rNqgLC9XDo",
+        appId: "1:630275962648:web:654f376e1ad93dec93106d",
+        messagingSenderId: "630275962648",
+        projectId: "lifemetricapp",
+        storageBucket: "lifemetricapp.firebasestorage.app",
+        databaseURL: "https://lifemetricapp-default-rtdb.firebaseio.com",
       ),
     );
   } catch (e) {
@@ -109,6 +110,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
   late Timer _timer;
   String _currentTime = '';
   String _currentDate = '';
+  bool _isWrappedReset = false;
 
   // Çağrı Kalkanı Listesi
   final List<Map<String, dynamic>> _contactsAnalysis = [
@@ -154,14 +156,13 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
     _updateDateTime();
     _timer = Timer.periodic(const Duration(seconds: 1), (timer) => _updateDateTime());
     
-    // 1. Karşı taraf linke tıkladığında URL'den gelen kodu buluta yaz
+    // 1. URL'den gelen onay kodunu buluta yaz
     _processIncomingUrlApproval();
 
-    // 2. Buluttaki değişiklikleri canlı dinle (Karşı taraf onayladığı an ekranda otomatik yeşil olsun)
+    // 2. Buluttaki onayları canlı dinle (Gerçek Zamanlı Senkronizasyon)
     _listenToCloudDatabase();
   }
 
-  // URL'de onay kodu varsa buluta işleme
   void _processIncomingUrlApproval() {
     try {
       final Uri uri = Uri.base;
@@ -175,7 +176,6 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
     } catch (e) {}
   }
 
-  // Bulut veritabanını canlı dinleme (Real-time synchronization)
   void _listenToCloudDatabase() {
     try {
       final ref = FirebaseDatabase.instance.ref('approvals');
@@ -187,7 +187,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
               bool approved = value['isApproved'] ?? false;
               if (approved) {
                 for (var person in _trackedSecurityNetwork) {
-                  if (person['code'] == codeKey) {
+                  if (person['code'] == codeKey && !person['isApproved']) {
                     person['isApproved'] = true;
                     person['status'] = 'Güvenlik Ağına Dahil (Onaylandı)';
                     person['location'] = 'Konum Paylaşılıyor';
@@ -317,7 +317,6 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
     );
   }
 
-  // --- GÜVENLİK AĞI & BULUT SENKRONİZASYONLU EKRAN ---
   Widget _buildTrackedNetworkView(bool isDark) {
     return ListView(
       padding: const EdgeInsets.all(16.0),
@@ -409,7 +408,6 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                 ),
                 const SizedBox(height: 12),
                 
-                // Durum Göstergesi (Buluttan canlı güncellenir)
                 if (!isApproved)
                   Container(
                     width: double.infinity,
@@ -541,7 +539,6 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                 String phone = phoneController.text.trim();
                 String personName = nameController.text.trim();
                 
-                // 4 haneli rastgele benzersiz onay kodu
                 String randomCode = (1000 + Random().nextInt(9000)).toString();
                 
                 String message = "LifeMetric Güvenlik Ağı: $personName, davetlisiniz. Onaylamak için tıklayın: https://kemalerdal1980-creator.github.io/lifemetric/?onayKodu=$randomCode";

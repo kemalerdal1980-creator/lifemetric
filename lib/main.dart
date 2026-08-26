@@ -18,7 +18,6 @@ Telif Yılı       : 2026
 import 'dart:async';
 import 'dart:math';
 import 'package:flutter/material.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_database/firebase_database.dart';
@@ -26,7 +25,6 @@ import 'package:firebase_database/firebase_database.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   
-  // Sizin Kendi Gerçek Firebase Bağlantı Bilgileriniz (LifeMetricApp)
   try {
     await Firebase.initializeApp(
       options: const FirebaseOptions(
@@ -38,9 +36,7 @@ void main() async {
         databaseURL: "https://lifemetricapp-default-rtdb.firebaseio.com",
       ),
     );
-  } catch (e) {
-    // Zaten başlatılmışsa yoksay
-  }
+  } catch (e) {}
 
   runApp(const LifeMetricApp());
 }
@@ -126,11 +122,33 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
       'block': false,
       'mask': false,
     },
+  ];
+
+  // Akıllı SMS & Bahis Kalkanı Kuralları
+  final List<Map<String, dynamic>> _smsRules = [
     {
-      'name': 'Reklam / Spam Numara',
-      'phone': '+90 850 999 8877',
-      'block': true,
-      'mask': false,
+      'pattern': '0850',
+      'type': 'Numara Öneki (0850)',
+      'isActive': true,
+      'description': 'Tüm 0850 ile başlayan aramalar ve SMSler engellenir.',
+    },
+    {
+      'pattern': 'bahis',
+      'type': 'İçerik Kelimesi',
+      'isActive': true,
+      'description': 'İçinde "bahis" geçen mesajlar otomatik bloklanır.',
+    },
+    {
+      'pattern': 'casino',
+      'type': 'İçerik Kelimesi',
+      'isActive': true,
+      'description': 'İçinde "casino" veya "slot" geçen mesajlar engellenir.',
+    },
+    {
+      'pattern': 'bonus',
+      'type': 'İçerik Kelimesi',
+      'isActive': true,
+      'description': 'Yatırım/bonus teklif eden dolandırıcılık SMSleri filtrelenir.',
     },
   ];
 
@@ -152,14 +170,11 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 3, vsync: this);
+    _tabController = TabController(length: 4, vsync: this); // 4 Sekme
     _updateDateTime();
     _timer = Timer.periodic(const Duration(seconds: 1), (timer) => _updateDateTime());
     
-    // 1. URL'den gelen onay kodunu buluta yaz
     _processIncomingUrlApproval();
-
-    // 2. Buluttaki onayları canlı dinle (Gerçek Zamanlı Senkronizasyon)
     _listenToCloudDatabase();
   }
 
@@ -275,7 +290,8 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
           tabs: const [
             Tab(icon: Icon(Icons.bar_chart_rounded, size: 18), text: 'Hayatındaki Sayılar'),
             Tab(icon: Icon(Icons.security_rounded, size: 18), text: 'Çağrı Kalkanı'),
-            Tab(icon: Icon(Icons.person_search_rounded, size: 18), text: 'Kişi Takibi & Güvenlik Ağı'),
+            Tab(icon: Icon(Icons.sms_failed_rounded, size: 18), text: 'Akıllı SMS Kalkanı'),
+            Tab(icon: Icon(Icons.person_search_rounded, size: 18), text: 'Güvenlik Ağı'),
           ],
         ),
       ),
@@ -287,6 +303,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
               children: [
                 _buildLifeWrappedView(isDark),
                 _buildCallShieldView(isDark),
+                _buildSmsShieldView(isDark),
                 _buildTrackedNetworkView(isDark),
               ],
             ),
@@ -311,6 +328,196 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                 ),
               ],
             ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // --- AKILLI SMS & BAHİS KALKANI EKRANI ---
+  Widget _buildSmsShieldView(bool isDark) {
+    return ListView(
+      padding: const EdgeInsets.all(16.0),
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Row(
+              children: [
+                const Icon(Icons.sms_failed_rounded, color: Color(0xFFEF4444), size: 24),
+                const SizedBox(width: 12),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('Akıllı SMS & Bahis Kalkanı', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: isDark ? Colors.white : Colors.black87)),
+                    Text('0850 ve spam/bahis içeriklerini otomatik engelle', style: TextStyle(color: isDark ? const Color(0xFF9CA3AF) : Colors.grey[600], fontSize: 11)),
+                  ],
+                ),
+              ],
+            ),
+            ElevatedButton.icon(
+              style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF2563EB)),
+              icon: const Icon(Icons.add_moderator, size: 16, color: Colors.white),
+              label: const Text('Yeni Kural Ekle', style: TextStyle(fontSize: 12, color: Colors.white, fontWeight: FontWeight.bold)),
+              onPressed: () => _showAddSmsRuleDialog(isDark),
+            ),
+          ],
+        ),
+        const SizedBox(height: 16),
+        Container(
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: const Color(0xFFEF4444).withOpacity(0.1),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: const Color(0xFFEF4444).withOpacity(0.3)),
+          ),
+          child: const Row(
+            children: [
+              Icon(Icons.shield, color: Color(0xFFEF4444), size: 20),
+              SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  'Aktif Kalkan: Belirttiğiniz kelimeleri (bahis, casino, bonus vb.) veya 0850\'li hatları içeren gelen mesajlar sistem tarafından anında süzülür.',
+                  style: TextStyle(fontSize: 11, color: Color(0xFFEF4444), fontWeight: FontWeight.w600),
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 20),
+        ..._smsRules.asMap().entries.map((entry) {
+          int index = entry.key;
+          var rule = entry.value;
+          bool isActive = rule['isActive'];
+
+          return Container(
+            margin: const EdgeInsets.only(bottom: 12),
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: isDark ? const Color(0xFF161E2E) : Colors.white,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(
+                color: isActive ? const Color(0xFFEF4444).withOpacity(0.5) : Colors.grey.withOpacity(0.3),
+                width: 1.5,
+              ),
+            ),
+            child: Row(
+              children: [
+                CircleAvatar(
+                  backgroundColor: isActive ? const Color(0xFFEF4444).withOpacity(0.2) : Colors.grey.withOpacity(0.2),
+                  child: Icon(
+                    isActive ? Icons.block : Icons.check_circle_outline,
+                    color: isActive ? const Color(0xFFEF4444) : Colors.grey,
+                  ),
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Text(
+                            '"${rule['pattern']}"',
+                            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: isDark ? Colors.white : Colors.black87),
+                          ),
+                          const SizedBox(width: 8),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF38BDF8).withOpacity(0.15),
+                              borderRadius: BorderRadius.circular(4),
+                            ),
+                            child: Text(rule['type'], style: const TextStyle(fontSize: 9, color: Color(0xFF38BDF8), fontWeight: FontWeight.bold)),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 4),
+                      Text(rule['description'], style: TextStyle(color: isDark ? const Color(0xFF9CA3AF) : Colors.grey[600], fontSize: 11)),
+                    ],
+                  ),
+                ),
+                Switch(
+                  value: isActive,
+                  activeColor: const Color(0xFFEF4444),
+                  onChanged: (val) {
+                    setState(() {
+                      rule['isActive'] = val;
+                    });
+                  },
+                ),
+                IconButton(
+                  icon: const Icon(Icons.delete_outline, color: Colors.grey, size: 20),
+                  onPressed: () {
+                    setState(() {
+                      _smsRules.removeAt(index);
+                    });
+                  },
+                ),
+              ],
+            ),
+          );
+        }).toList(),
+      ],
+    );
+  }
+
+  void _showAddSmsRuleDialog(bool isDark) {
+    final patternController = TextEditingController();
+    final descController = TextEditingController();
+    String selectedType = 'İçerik Kelimesi';
+
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: isDark ? const Color(0xFF161E2E) : Colors.white,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Text('Yeni SMS Filtre Kuralı Ekle', style: TextStyle(color: isDark ? Colors.white : Colors.black87, fontWeight: FontWeight.bold, fontSize: 16)),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            TextField(
+              controller: patternController,
+              style: TextStyle(color: isDark ? Colors.white : Colors.black87),
+              decoration: InputDecoration(labelText: 'Engellenecek Kelime veya Numara (Örn: Casino)', labelStyle: TextStyle(color: isDark ? const Color(0xFF9CA3AF) : Colors.grey[600])),
+            ),
+            const SizedBox(height: 10),
+            TextField(
+              controller: descController,
+              style: TextStyle(color: isDark ? Colors.white : Colors.black87),
+              decoration: InputDecoration(labelText: 'Kural Açıklaması', labelStyle: TextStyle(color: isDark ? const Color(0xFF9CA3AF) : Colors.grey[600])),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('İptal', style: TextStyle(color: Colors.grey)),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFEF4444)),
+            onPressed: () {
+              if (patternController.text.isNotEmpty) {
+                setState(() {
+                  _smsRules.add({
+                    'pattern': patternController.text.trim(),
+                    'type': selectedType,
+                    'isActive': true,
+                    'description': descController.text.isNotEmpty ? descController.text : 'Özel tanımlı spam kuralı.',
+                  });
+                });
+                Navigator.pop(context);
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Yeni SMS engelleme kuralı başarıyla eklendi!'),
+                    backgroundColor: Color(0xFF10B981),
+                    duration: Duration(seconds: 2),
+                  ),
+                );
+              }
+            },
+            child: const Text('Kuralı Ekle', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
           ),
         ],
       ),
@@ -362,7 +569,6 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                 color: isApproved ? const Color(0xFF10B981).withOpacity(0.5) : const Color(0xFFF59E0B).withOpacity(0.5),
                 width: 1.5,
               ),
-              boxShadow: isDark ? [] : [BoxShadow(color: Colors.grey.withOpacity(0.1), blurRadius: 6, offset: const Offset(0, 2))],
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -390,24 +596,15 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                     ),
                     IconButton(
                       icon: const Icon(Icons.delete_outline, color: Color(0xFFEF4444), size: 22),
-                      tooltip: 'Ağdan Çıkar',
                       onPressed: () {
                         setState(() {
                           _trackedSecurityNetwork.removeAt(index);
                         });
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text('Kişi güvenlik ağından çıkarıldı.'),
-                            backgroundColor: Colors.red,
-                            duration: Duration(seconds: 2),
-                          ),
-                        );
                       },
                     ),
                   ],
                 ),
                 const SizedBox(height: 12),
-                
                 if (!isApproved)
                   Container(
                     width: double.infinity,
@@ -429,8 +626,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                       ],
                     ),
                   ),
-
-                if (!isApproved) const SizedBox(height: 10),
+                const SizedBox(height: 10),
                 Divider(color: isDark ? Colors.white10 : Colors.grey[200], height: 1),
                 const SizedBox(height: 10),
                 Row(
@@ -466,17 +662,10 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                       ),
                       child: Text(
                         person['status'],
-                        style: TextStyle(
-                          fontSize: 11,
-                          fontWeight: FontWeight.bold,
-                          color: isApproved ? const Color(0xFF10B981) : const Color(0xFFF59E0B),
-                        ),
+                        style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: isApproved ? const Color(0xFF10B981) : const Color(0xFFF59E0B)),
                       ),
                     ),
-                    Text(
-                      isApproved ? 'Konum: ${person['location']}' : 'Talep Tarihi: ${person['requestDate']}',
-                      style: TextStyle(fontSize: 11, color: isDark ? const Color(0xFF9CA3AF) : Colors.grey[600]),
-                    ),
+                    Text(isApproved ? 'Konum: ${person['location']}' : 'Talep: ${person['requestDate']}', style: TextStyle(fontSize: 11, color: isDark ? const Color(0xFF9CA3AF) : Colors.grey[600])),
                   ],
                 ),
               ],
@@ -513,18 +702,6 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
               style: TextStyle(color: isDark ? Colors.white : Colors.black87),
               decoration: InputDecoration(labelText: 'Telefon Numarası (+90 ...)', labelStyle: TextStyle(color: isDark ? const Color(0xFF9CA3AF) : Colors.grey[600])),
             ),
-            const SizedBox(height: 16),
-            Container(
-              padding: const EdgeInsets.all(10),
-              decoration: BoxDecoration(
-                color: isDark ? const Color(0xFF1F2937) : Colors.grey[200],
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: const Text(
-                'SMS gönderildiğinde kişiye özel bulut onay linki gider. Tıkladığı an sizin ekranınız otomatik yeşile döner.',
-                style: TextStyle(fontSize: 10, fontStyle: FontStyle.italic, color: Color(0xFF38BDF8)),
-              ),
-            ),
           ],
         ),
         actions: [
@@ -538,7 +715,6 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
               if (nameController.text.isNotEmpty && phoneController.text.isNotEmpty) {
                 String phone = phoneController.text.trim();
                 String personName = nameController.text.trim();
-                
                 String randomCode = (1000 + Random().nextInt(9000)).toString();
                 
                 String message = "LifeMetric Güvenlik Ağı: $personName, davetlisiniz. Onaylamak için tıklayın: https://kemalerdal1980-creator.github.io/lifemetric/?onayKodu=$randomCode";
@@ -567,13 +743,6 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                 });
 
                 Navigator.pop(context);
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text('Bulut senkronizasyonlu SMS hazırlandı! Kod: $randomCode'),
-                    backgroundColor: const Color(0xFF10B981),
-                    duration: const Duration(seconds: 4),
-                  ),
-                );
               }
             },
             child: const Text('SMS Uygulamasını Aç & Ekle', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
@@ -583,7 +752,6 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
     );
   }
 
-  // --- ÇAĞRI KALKANI & REHBER YÖNETİMİ EKRANI ---
   Widget _buildCallShieldView(bool isDark) {
     return ListView(
       padding: const EdgeInsets.all(16.0),
@@ -612,11 +780,6 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
             ),
           ],
         ),
-        const SizedBox(height: 16),
-        const Text(
-          'Rehberinizden eklediğiniz kişileri buradan yönetebilirsiniz. Hiçbir kutucuk seçilmezse normal çağrı alınır.',
-          style: TextStyle(color: Colors.grey, fontSize: 13),
-        ),
         const SizedBox(height: 20),
         ..._contactsAnalysis.asMap().entries.map((entry) {
           int index = entry.key;
@@ -628,13 +791,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
             decoration: BoxDecoration(
               color: isDark ? const Color(0xFF161E2E) : Colors.white,
               borderRadius: BorderRadius.circular(16),
-              border: Border.all(
-                color: contact['block'] 
-                    ? Colors.red.withOpacity(0.5) 
-                    : (contact['mask'] ? Colors.amber.withOpacity(0.5) : const Color(0xFF38BDF8).withOpacity(0.3)),
-                width: 1.5,
-              ),
-              boxShadow: isDark ? [] : [BoxShadow(color: Colors.grey.withOpacity(0.1), blurRadius: 6, offset: const Offset(0, 2))],
+              border: Border.all(color: const Color(0xFF38BDF8).withOpacity(0.3), width: 1.5),
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -642,51 +799,25 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                 Row(
                   children: [
                     CircleAvatar(
-                      radius: 22,
-                      backgroundColor: contact['block'] 
-                          ? Colors.red.withOpacity(0.2) 
-                          : (contact['mask'] ? Colors.amber.withOpacity(0.2) : const Color(0xFF38BDF8).withOpacity(0.2)),
-                      child: Icon(
-                        contact['block'] ? Icons.block : (contact['mask'] ? Icons.lock_person : Icons.person),
-                        color: contact['block'] ? Colors.red : (contact['mask'] ? Colors.amber : const Color(0xFF38BDF8)),
-                        size: 20,
-                      ),
+                      backgroundColor: const Color(0xFF38BDF8).withOpacity(0.2),
+                      child: const Icon(Icons.person, color: Color(0xFF38BDF8)),
                     ),
                     const SizedBox(width: 14),
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(
-                            contact['name'],
-                            style: TextStyle(
-                              fontWeight: FontWeight.bold,
-                              fontSize: 15,
-                              color: isDark ? Colors.white : Colors.black87,
-                            ),
-                          ),
-                          const SizedBox(height: 2),
-                          Text(
-                            contact['phone'],
-                            style: TextStyle(color: isDark ? const Color(0xFF9CA3AF) : Colors.grey[600], fontSize: 12),
-                          ),
+                          Text(contact['name'], style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: isDark ? Colors.white : Colors.black87)),
+                          Text(contact['phone'], style: TextStyle(color: isDark ? const Color(0xFF9CA3AF) : Colors.grey[600], fontSize: 12)),
                         ],
                       ),
                     ),
                     IconButton(
                       icon: const Icon(Icons.delete_outline, color: Color(0xFFEF4444), size: 22),
-                      tooltip: 'Kişiyi Kaldır',
                       onPressed: () {
                         setState(() {
                           _contactsAnalysis.removeAt(index);
                         });
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text('Kişi çağrı kalkanından silindi.'),
-                            backgroundColor: Colors.red,
-                            duration: Duration(seconds: 2),
-                          ),
-                        );
                       },
                     ),
                   ],
@@ -707,14 +838,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                             });
                           },
                         ),
-                        Text(
-                          'Çağrı Engelleme',
-                          style: TextStyle(
-                            color: isDark ? Colors.white70 : Colors.black87,
-                            fontSize: 12,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
+                        Text('Çağrı Engelleme', style: TextStyle(color: isDark ? Colors.white70 : Colors.black87, fontSize: 12, fontWeight: FontWeight.w600)),
                       ],
                     ),
                     Row(
@@ -729,14 +853,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                             });
                           },
                         ),
-                        Text(
-                          'Maskeli Çağrı',
-                          style: TextStyle(
-                            color: isDark ? Colors.white70 : Colors.black87,
-                            fontSize: 12,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
+                        Text('Maskeli Çağrı', style: TextStyle(color: isDark ? Colors.white70 : Colors.black87, fontSize: 12, fontWeight: FontWeight.w600)),
                       ],
                     ),
                   ],
@@ -795,13 +912,6 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                   });
                 });
                 Navigator.pop(context);
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Kişi başarıyla kalkan listesine eklendi!'),
-                    backgroundColor: Color(0xFF10B981),
-                    duration: Duration(seconds: 2),
-                  ),
-                );
               }
             },
             child: const Text('Listeye Ekle', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
@@ -823,46 +933,30 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text('Hayatındaki Sayılar (Life Wrapped)', style: TextStyle(fontSize: 19, fontWeight: FontWeight.bold, color: isDark ? Colors.white : Colors.black87)),
-                  const SizedBox(height: 2),
                   Text('24 saatlik döngünüz ve yaşam analitiği verileri.', style: TextStyle(color: isDark ? const Color(0xFF9CA3AF) : Colors.grey[600], fontSize: 12)),
                 ],
               ),
             ),
             OutlinedButton.icon(
-              style: OutlinedButton.styleFrom(
-                foregroundColor: const Color(0xFFEF4444),
-                side: const BorderSide(color: Color(0xFFEF4444)),
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-              ),
+              style: OutlinedButton.styleFrom(foregroundColor: const Color(0xFFEF4444), side: const BorderSide(color: Color(0xFFEF4444))),
               icon: const Icon(Icons.refresh, size: 16),
               label: const Text('Sıfırla', style: TextStyle(fontSize: 12)),
               onPressed: () {
                 setState(() {
                   _isWrappedReset = !_isWrappedReset;
                 });
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Hayatındaki Sayılar verileri başarıyla sıfırlandı/yenilendi!'),
-                    backgroundColor: Color(0xFF10B981),
-                    duration: Duration(seconds: 2),
-                  ),
-                );
               },
             ),
           ],
         ),
         const SizedBox(height: 20),
-        
         if (_isWrappedReset)
           Container(
             padding: const EdgeInsets.all(32),
             alignment: Alignment.center,
-            child: Text(
-              'Tüm veriler sıfırlandı. Yeni verilerin derlenmesi bekleniyor...',
-              style: TextStyle(color: isDark ? const Color(0xFF9CA3AF) : Colors.grey[600], fontStyle: FontStyle.italic),
-            ),
+            child: Text('Tüm veriler sıfırlandı. Yeni verilerin derlenmesi bekleniyor...', style: TextStyle(color: isDark ? const Color(0xFF9CA3AF) : Colors.grey[600], fontStyle: FontStyle.italic)),
           )
-        else ...[
+        else
           _buildWrappedCard(
             title: 'Günün Özeti (24 Saatlik Zaman Dağılımı)',
             mainStat: '24 Saat / Tam Gün Dağılımı',
@@ -881,19 +975,11 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
               ],
             ),
           ),
-        ],
       ],
     );
   }
 
-  Widget _buildWrappedCard({
-    required String title,
-    required String mainStat,
-    required IconData icon,
-    required Color color,
-    required bool isDark,
-    required Widget child,
-  }) {
+  Widget _buildWrappedCard({required String title, required String mainStat, required IconData icon, required Color color, required bool isDark, required Widget child}) {
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
       padding: const EdgeInsets.all(18),
@@ -901,27 +987,19 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
         color: isDark ? const Color(0xFF161E2E) : Colors.white,
         borderRadius: BorderRadius.circular(18),
         border: Border.all(color: color.withOpacity(0.3), width: 1.5),
-        boxShadow: [
-          BoxShadow(color: color.withOpacity(0.05), blurRadius: 10, offset: const Offset(0, 4)),
-        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              CircleAvatar(
-                radius: 22,
-                backgroundColor: color.withOpacity(0.15),
-                child: Icon(icon, color: color, size: 24),
-              ),
+              CircleAvatar(radius: 22, backgroundColor: color.withOpacity(0.15), child: Icon(icon, color: color, size: 24)),
               const SizedBox(width: 14),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(title, style: TextStyle(color: isDark ? const Color(0xFF9CA3AF) : Colors.grey[600], fontSize: 11, fontWeight: FontWeight.w800, letterSpacing: 0.5)),
-                    const SizedBox(height: 2),
                     Text(mainStat, style: TextStyle(color: color, fontSize: 17, fontWeight: FontWeight.bold)),
                   ],
                 ),
@@ -964,7 +1042,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text('LifeMetric v1.0.0', style: TextStyle(color: Color(0xFF38BDF8), fontWeight: FontWeight.bold)),
+            const Text('LifeMetric v2.0.0', style: TextStyle(color: Color(0xFF38BDF8), fontWeight: FontWeight.bold)),
             const SizedBox(height: 6),
             Text('Fark Et, Tasarruf Et, Yaşa.', style: TextStyle(color: widget.isDarkMode ? const Color(0xFF9CA3AF) : Colors.grey[600], fontSize: 12)),
             const Divider(color: Colors.white24, height: 20),

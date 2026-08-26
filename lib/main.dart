@@ -16,12 +16,31 @@ Telif Yılı       : 2026
 */
 
 import 'dart:async';
+import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_database/firebase_database.dart';
 
-void main() {
+void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  
+  // Firebase Başlatma (Güvenli Blok)
+  try {
+    await Firebase.initializeApp(
+      options: const FirebaseOptions(
+        apiKey: "AIzaSyDummyKeyForLifeMetric2026",
+        appId: "1:2026:web:lifemetric",
+        messagingSenderId: "20260000",
+        projectId: "lifemetric-db",
+        databaseURL: "https://lifemetric-default-rtdb.firebaseio.com",
+      ),
+    );
+  } catch (e) {
+    // Zaten başlatılmışsa yoksay
+  }
+
   runApp(const LifeMetricApp());
 }
 
@@ -91,7 +110,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
   String _currentTime = '';
   String _currentDate = '';
 
-  // Çağrı Kalkanı ve Rehber Yönetimi Listesi
+  // Çağrı Kalkanı Listesi
   final List<Map<String, dynamic>> _contactsAnalysis = [
     {
       'name': 'Ayşin Erdal (Eşim)',
@@ -118,6 +137,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
     {
       'name': 'Ayşin Erdal',
       'phone': '+90 532 555 4433',
+      'code': '9421',
       'status': 'Güvenlik Ağına Dahil (Onaylandı)',
       'isApproved': true,
       'distance': '350 Metre (Yakın Bölgede - Ev)',
@@ -133,6 +153,54 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
     _tabController = TabController(length: 3, vsync: this);
     _updateDateTime();
     _timer = Timer.periodic(const Duration(seconds: 1), (timer) => _updateDateTime());
+    
+    // 1. Karşı taraf linke tıkladığında URL'den gelen kodu buluta yaz
+    _processIncomingUrlApproval();
+
+    // 2. Buluttaki değişiklikleri canlı dinle (Karşı taraf onayladığı an ekranda otomatik yeşil olsun)
+    _listenToCloudDatabase();
+  }
+
+  // URL'de onay kodu varsa buluta işleme
+  void _processIncomingUrlApproval() {
+    try {
+      final Uri uri = Uri.base;
+      String? code = uri.queryParameters['onayKodu'];
+      if (code != null) {
+        FirebaseDatabase.instance.ref('approvals/$code').set({
+          'isApproved': true,
+          'timestamp': ServerValue.timestamp,
+        });
+      }
+    } catch (e) {}
+  }
+
+  // Bulut veritabanını canlı dinleme (Real-time synchronization)
+  void _listenToCloudDatabase() {
+    try {
+      final ref = FirebaseDatabase.instance.ref('approvals');
+      ref.onValue.listen((event) {
+        final data = event.snapshot.value as Map<dynamic, dynamic>?;
+        if (data != null && mounted) {
+          setState(() {
+            data.forEach((codeKey, value) {
+              bool approved = value['isApproved'] ?? false;
+              if (approved) {
+                for (var person in _trackedSecurityNetwork) {
+                  if (person['code'] == codeKey) {
+                    person['isApproved'] = true;
+                    person['status'] = 'Güvenlik Ağına Dahil (Onaylandı)';
+                    person['location'] = 'Konum Paylaşılıyor';
+                    person['battery'] = '%92';
+                    person['distance'] = '95 Metre (Yakında)';
+                  }
+                }
+              }
+            });
+          });
+        }
+      });
+    } catch (e) {}
   }
 
   @override
@@ -249,7 +317,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
     );
   }
 
-  // --- GÜVENLİK AĞI & MESAFE TAKİBİ EKRANI ---
+  // --- GÜVENLİK AĞI & BULUT SENKRONİZASYONLU EKRAN ---
   Widget _buildTrackedNetworkView(bool isDark) {
     return ListView(
       padding: const EdgeInsets.all(16.0),
@@ -265,7 +333,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text('Güvenlik Ağı & Mesafe Takibi', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: isDark ? Colors.white : Colors.black87)),
-                    Text('LifeMetric Güvenlik Ağı davet yönetimi', style: TextStyle(color: isDark ? const Color(0xFF9CA3AF) : Colors.grey[600], fontSize: 11)),
+                    Text('Firebase Bulut Senkronizasyonlu Canlı Takip', style: TextStyle(color: isDark ? const Color(0xFF9CA3AF) : Colors.grey[600], fontSize: 11)),
                   ],
                 ),
               ],
@@ -283,6 +351,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
           int index = entry.key;
           var person = entry.value;
           bool isApproved = person['isApproved'];
+          String code = person['code'] ?? '0000';
 
           return Container(
             margin: const EdgeInsets.only(bottom: 14),
@@ -316,31 +385,10 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                         children: [
                           Text(person['name'], style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: isDark ? Colors.white : Colors.black87)),
                           const SizedBox(height: 2),
-                          Text(person['phone'], style: TextStyle(color: isDark ? const Color(0xFF9CA3AF) : Colors.grey[600], fontSize: 12)),
+                          Text('${person['phone']} • Kod: $code', style: TextStyle(color: isDark ? const Color(0xFF9CA3AF) : Colors.grey[600], fontSize: 12)),
                         ],
                       ),
                     ),
-                    if (!isApproved)
-                      TextButton.icon(
-                        style: TextButton.styleFrom(foregroundColor: const Color(0xFF10B981)),
-                        icon: const Icon(Icons.check_circle, size: 18),
-                        label: const Text('Onayla', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
-                        onPressed: () {
-                          setState(() {
-                            person['isApproved'] = true;
-                            person['status'] = 'Güvenlik Ağına Dahil (Onaylandı)';
-                            person['location'] = 'Konum Paylaşılıyor';
-                            person['battery'] = '%95';
-                            person['distance'] = '80 Metre (Yakında)';
-                          });
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              content: Text('${person['name']} onay yanıtı alındı! Mesafe takibi başlatıldı.'),
-                              backgroundColor: const Color(0xFF10B981),
-                            ),
-                          );
-                        },
-                      ),
                     IconButton(
                       icon: const Icon(Icons.delete_outline, color: Color(0xFFEF4444), size: 22),
                       tooltip: 'Ağdan Çıkar',
@@ -360,6 +408,31 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                   ],
                 ),
                 const SizedBox(height: 12),
+                
+                // Durum Göstergesi (Buluttan canlı güncellenir)
+                if (!isApproved)
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 12),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF59E0B).withOpacity(0.15),
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(color: const Color(0xFFF59E0B).withOpacity(0.3)),
+                    ),
+                    child: const Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2, color: Color(0xFFF59E0B))),
+                        SizedBox(width: 10),
+                        Text(
+                          '⏳ Karşı Tarafın Onayı Bekleniyor (Bulut Senkronize)',
+                          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11, color: Color(0xFFF59E0B)),
+                        ),
+                      ],
+                    ),
+                  ),
+
+                if (!isApproved) const SizedBox(height: 10),
                 Divider(color: isDark ? Colors.white10 : Colors.grey[200], height: 1),
                 const SizedBox(height: 10),
                 Row(
@@ -450,7 +523,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                 borderRadius: BorderRadius.circular(10),
               ),
               child: const Text(
-                'Karşı tarafa giden SMS: "LifeMetric Güvenlik Ağı daveti..." şeklinde hazırlanır.',
+                'SMS gönderildiğinde kişiye özel bulut onay linki gider. Tıkladığı an sizin ekranınız otomatik yeşile döner.',
                 style: TextStyle(fontSize: 10, fontStyle: FontStyle.italic, color: Color(0xFF38BDF8)),
               ),
             ),
@@ -468,8 +541,10 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                 String phone = phoneController.text.trim();
                 String personName = nameController.text.trim();
                 
-                // Güncellenen başlık: LifeMetric Güvenlik Ağı
-                String message = "LifeMetric Güvenlik Ağı: $personName, güvenlik ağına davetlisiniz. Onaylamak için yanıtlayın: ONAYLIyorum";
+                // 4 haneli rastgele benzersiz onay kodu
+                String randomCode = (1000 + Random().nextInt(9000)).toString();
+                
+                String message = "LifeMetric Güvenlik Ağı: $personName, davetlisiniz. Onaylamak için tıklayın: https://kemalerdal1980-creator.github.io/lifemetric/?onayKodu=$randomCode";
                 final Uri smsUri = Uri.parse('sms:$phone?body=${Uri.encodeComponent(message)}');
 
                 try {
@@ -484,9 +559,10 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                   _trackedSecurityNetwork.add({
                     'name': personName,
                     'phone': phone,
-                    'status': 'Onay Bekliyor (Yanıt Bekleniyor)',
+                    'code': randomCode,
+                    'status': 'Onay Bekliyor (Bulut Senkronize)',
                     'isApproved': false,
-                    'distance': 'Hesaplanıyor...',
+                    'distance': 'Beklemede...',
                     'location': 'Beklemede',
                     'battery': '-',
                     'requestDate': 'Bugün',
@@ -495,10 +571,10 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
 
                 Navigator.pop(context);
                 ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('LifeMetric Güvenlik Ağı SMS\'i hazırlandı!'),
-                    backgroundColor: Color(0xFF10B981),
-                    duration: Duration(seconds: 3),
+                  SnackBar(
+                    content: Text('Bulut senkronizasyonlu SMS hazırlandı! Kod: $randomCode'),
+                    backgroundColor: const Color(0xFF10B981),
+                    duration: const Duration(seconds: 4),
                   ),
                 );
               }

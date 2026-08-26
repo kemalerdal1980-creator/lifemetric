@@ -7,7 +7,7 @@ arayüz tasarımları, grafik materyalleri, marka kimliği, sloganları ("Fark E
 Tasarruf Et, Yaşa.") ve ilgili tüm dokümantasyonun fikri ve sınai mülkiyet hakları, 
 geliştirme ve yayılma yetkileri tamamen Kemal ERDAL'a aittir.
 
-Proje Adı        : LifeMetric
+Proje Adı         : LifeMetric
 Slogan           : Fark Et, Tasarruf Et, Yaşa.
 Geliştirici & Mülk Sahibi : Kemal ERDAL
 Telif Yılı       : 2026
@@ -102,7 +102,8 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
       'duration': '14 Dakika',
       'status': 'Aktif / Çevrimiçi',
       'isActive': true,
-      'isBlocked': false,
+      'block': false,
+      'mask': false,
     },
     {
       'name': 'Abim',
@@ -111,7 +112,8 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
       'duration': '8 Dakika',
       'status': 'Aktif',
       'isActive': true,
-      'isBlocked': false,
+      'block': false,
+      'mask': false,
     },
     {
       'name': 'Reklam / Spam Numara',
@@ -120,7 +122,8 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
       'duration': '0 Dakika',
       'status': 'Engellenmiş Numara',
       'isActive': false,
-      'isBlocked': true,
+      'block': true,
+      'mask': false,
     },
   ];
 
@@ -606,6 +609,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
     );
   }
 
+  // --- İSTEDİĞİNİZ KUTUCUKLU ÇAĞRI KALKANI GÖRÜNÜMÜ ---
   Widget _buildCallShieldView(bool isDark) {
     return ListView(
       padding: const EdgeInsets.all(16.0),
@@ -625,12 +629,15 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
             ),
           ],
         ),
+        const SizedBox(height: 12),
+        const Text(
+          'Rehberinizdeki kişilerden engellemek veya maskeli çağrı almak istediklerinizi seçin. Hiçbir kutucuk seçilmezse işlem yapılmaz.',
+          style: TextStyle(color: Colors.grey, fontSize: 13),
+        ),
         const SizedBox(height: 20),
         ..._contactsAnalysis.asMap().entries.map((entry) {
           int index = entry.key;
           var contact = entry.value;
-          final bool isBlocked = contact['isBlocked'];
-          final String maskedName = _maskName(contact['name']);
 
           return Container(
             margin: const EdgeInsets.only(bottom: 12),
@@ -639,66 +646,103 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
               color: isDark ? const Color(0xFF161E2E) : Colors.white,
               borderRadius: BorderRadius.circular(16),
               border: Border.all(
-                color: isBlocked ? Colors.red.withOpacity(0.5) : const Color(0xFF38BDF8).withOpacity(0.3),
+                color: contact['block'] 
+                    ? Colors.red.withOpacity(0.5) 
+                    : (contact['mask'] ? Colors.amber.withOpacity(0.5) : const Color(0xFF38BDF8).withOpacity(0.3)),
                 width: 1.5,
               ),
               boxShadow: isDark ? [] : [BoxShadow(color: Colors.grey.withOpacity(0.1), blurRadius: 6, offset: const Offset(0, 2))],
             ),
-            child: Row(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                CircleAvatar(
-                  radius: 24,
-                  backgroundColor: isBlocked ? Colors.red.withOpacity(0.2) : const Color(0xFF38BDF8).withOpacity(0.2),
-                  child: Icon(
-                    isBlocked ? Icons.block : Icons.lock_person_outlined,
-                    color: isBlocked ? Colors.red : const Color(0xFF38BDF8),
-                  ),
+                Row(
+                  children: [
+                    CircleAvatar(
+                      radius: 22,
+                      backgroundColor: contact['block'] 
+                          ? Colors.red.withOpacity(0.2) 
+                          : (contact['mask'] ? Colors.amber.withOpacity(0.2) : const Color(0xFF38BDF8).withOpacity(0.2)),
+                      child: Icon(
+                        contact['block'] ? Icons.block : (contact['mask'] ? Icons.lock_person : Icons.person),
+                        color: contact['block'] ? Colors.red : (contact['mask'] ? Colors.amber : const Color(0xFF38BDF8)),
+                        size: 20,
+                      ),
+                    ),
+                    const SizedBox(width: 14),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            contact['name'],
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 15,
+                              color: isDark ? Colors.white : Colors.black87,
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            contact['phone'],
+                            style: TextStyle(color: isDark ? const Color(0xFF9CA3AF) : Colors.grey[600], fontSize: 12),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
                 ),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        isBlocked ? '${contact['name']} (ENGELLENDİ)' : maskedName,
-                        style: TextStyle(
-                          fontWeight: FontWeight.bold,
-                          fontSize: 15,
-                          color: isBlocked ? Colors.redAccent : (isDark ? Colors.white : Colors.black87),
-                          letterSpacing: 0.5,
+                const Divider(height: 20, color: Colors.white10),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    // 1. Seçenek: Çağrı Engelleme Kutucuğu
+                    Row(
+                      children: [
+                        Checkbox(
+                          value: contact['block'],
+                          activeColor: Colors.redAccent,
+                          onChanged: (bool? value) {
+                            setState(() {
+                              contact['block'] = value ?? false;
+                              if (contact['block']) contact['mask'] = false; // Çakışmayı önle
+                            });
+                          },
                         ),
-                      ),
-                      const SizedBox(height: 2),
-                      Text(contact['phone'], style: TextStyle(color: isDark ? const Color(0xFF9CA3AF) : Colors.grey[600], fontSize: 12)),
-                      const SizedBox(height: 6),
-                      Text(
-                        isBlocked ? 'Arama ve WhatsApp/SMS Mesajları Engellendi' : 'Çağrı/Mesaj Görünümü: Maskeli ($maskedName)',
-                        style: TextStyle(color: isBlocked ? Colors.red.withOpacity(0.8) : const Color(0xFF10B981), fontSize: 11, fontWeight: FontWeight.bold),
-                      ),
-                    ],
-                  ),
-                ),
-                IconButton(
-                  icon: Icon(
-                    isBlocked ? Icons.check_circle_outline : Icons.cancel_outlined,
-                    color: isBlocked ? const Color(0xFF10B981) : Colors.red,
-                    size: 26,
-                  ),
-                  tooltip: isBlocked ? 'Engeli Kaldır' : 'Numarayı Engelle',
-                  onPressed: () {
-                    setState(() {
-                      _contactsAnalysis[index]['isBlocked'] = !isBlocked;
-                    });
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text(isBlocked 
-                          ? '${contact['name']} engel listesinden çıkarıldı.' 
-                          : '${contact['name']} (${maskedName}) başarıyla engellendi!'),
-                        backgroundColor: isBlocked ? const Color(0xFF10B981) : Colors.red,
-                        duration: const Duration(seconds: 2),
-                      ),
-                    );
-                  },
+                        Text(
+                          'Çağrı Engelleme',
+                          style: TextStyle(
+                            color: isDark ? Colors.white70 : Colors.black87,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
+                    ),
+                    // 2. Seçenek: Maskeli Çağrı Kutucuğu
+                    Row(
+                      children: [
+                        Checkbox(
+                          value: contact['mask'],
+                          activeColor: Colors.amber,
+                          onChanged: (bool? value) {
+                            setState(() {
+                              contact['mask'] = value ?? false;
+                              if (contact['mask']) contact['block'] = false; // Çakışmayı önle
+                            });
+                          },
+                        ),
+                        Text(
+                          'Maskeli Çağrı',
+                          style: TextStyle(
+                            color: isDark ? Colors.white70 : Colors.black87,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
                 ),
               ],
             ),
